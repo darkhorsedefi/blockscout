@@ -10,7 +10,7 @@ window.onload = applyDarkMode()
 
 if (isDarkMode()) {
   if (document.getElementById('top-navbar')) {
-    document.getElementById('top-navbar').style.backgroundColor = '#282945'
+    document.getElementById('top-navbar').style.backgroundColor = '#191919'
   }
   const modeChanger = document.getElementById('dark-mode-changer')
   if (modeChanger) {
