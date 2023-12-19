@@ -9,13 +9,8 @@ defmodule BlockScoutWeb.LayoutView do
 
   @default_other_networks [
     %{
-      title: "Agorascan",
-      url: "https://"
-    },
-    %{
-      title: "Agorascan Test",
-      url: "https://",
-      test_net?: true
+      title: "AVIscan",
+      url: "https://explorer.avicoin.org"
     }
   ]
 
