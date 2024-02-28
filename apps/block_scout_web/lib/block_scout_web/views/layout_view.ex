@@ -9,7 +9,7 @@ defmodule BlockScoutWeb.LayoutView do
 
   @default_other_networks [
     %{
-      title: "Agorascan",
+      title: "CIFC Mainnet",
       url: "https://"
     },
     %{
