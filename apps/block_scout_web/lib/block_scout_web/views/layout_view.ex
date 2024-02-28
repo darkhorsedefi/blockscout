@@ -9,7 +9,7 @@ defmodule BlockScoutWeb.LayoutView do
 
   @default_other_networks [
     %{
-      title: "CHIF Mainnet",
+      title: "Charity Investment Fund",
       url: "https://"
     }
   ]
