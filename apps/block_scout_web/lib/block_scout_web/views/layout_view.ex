@@ -11,11 +11,6 @@ defmodule BlockScoutWeb.LayoutView do
     %{
       title: "CIFC Mainnet",
       url: "https://"
-    },
-    %{
-      title: "Agorascan Test",
-      url: "https://",
-      test_net?: true
     }
   ]
 
