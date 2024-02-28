@@ -568,7 +568,7 @@ msgstr ""
 
 #: lib/block_scout_web/templates/layout/_footer.html.eex:22
 #, elixir-autogen, elixir-format
-msgid "Charityscan is a tool for inspecting and analyzing the Charity Investment Fund blockchain network."
+msgid "This explorer is a tool for inspecting and analyzing the Charity Investment Fund blockchain network."
 msgstr ""
 
 #: lib/block_scout_web/templates/transaction_state/_state_change.html.eex:8
