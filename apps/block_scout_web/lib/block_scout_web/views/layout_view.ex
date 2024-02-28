@@ -10,7 +10,7 @@ defmodule BlockScoutWeb.LayoutView do
   @default_other_networks [
     %{
       title: "Charity Investment Fund",
-      url: "https://"
+      url: "https://explorer.charityinvestmentfund.org"
     }
   ]
 
