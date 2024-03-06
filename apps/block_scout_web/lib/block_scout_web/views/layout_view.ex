@@ -9,9 +9,14 @@ defmodule BlockScoutWeb.LayoutView do
 
   @default_other_networks [
     %{
-      title: "Charity Investment Fund",
-      url: "https://explorer.charityinvestmentfund.org"
-    }
+      title: "Nexis Mainnet",
+      url: "https://evm.nexscan.io/"
+    },
+    %{
+      title: "Nexis Testnet",
+      url: "https://evm-testnet.nexscan.io/",
+      test_net?: true
+    },
   ]
 
   alias BlockScoutWeb.SocialMedia
