@@ -234,8 +234,7 @@ defmodule Explorer.Chain.Import.Runner.Address.TokenBalancesTest do
 
     insert(:missing_balance_of_token,
       token_contract_address_hash: token_contract_address_hash,
-      block_number: block_number,
-      currently_implemented: true
+      block_number: block_number
     )
 
     address_hash = address.hash

@@ -59,15 +59,6 @@ defmodule Explorer.Chain.Import.Stage.BlockReferencing do
     Runner.Beacon.BlobTransactions
   ]
 
-  @arbitrum_runners [
-    Runner.Arbitrum.Messages,
-    Runner.Arbitrum.LifecycleTransactions,
-    Runner.Arbitrum.L1Executions,
-    Runner.Arbitrum.L1Batches,
-    Runner.Arbitrum.BatchBlocks,
-    Runner.Arbitrum.BatchTransactions
-  ]
-
   @impl Stage
   def runners do
     case Application.get_env(:explorer, :chain_type) do
@@ -89,9 +80,6 @@ defmodule Explorer.Chain.Import.Stage.BlockReferencing do
       :zksync ->
         @default_runners ++ @zksync_runners
 
-      :arbitrum ->
-        @default_runners ++ @arbitrum_runners
-
       _ ->
         @default_runners
     end
@@ -100,9 +88,7 @@ defmodule Explorer.Chain.Import.Stage.BlockReferencing do
   @impl Stage
   def all_runners do
     @default_runners ++
-      @ethereum_runners ++
-      @optimism_runners ++
-      @polygon_edge_runners ++ @polygon_zkevm_runners ++ @shibarium_runners ++ @zksync_runners ++ @arbitrum_runners
+      @optimism_runners ++ @polygon_edge_runners ++ @polygon_zkevm_runners ++ @shibarium_runners ++ @zksync_runners
   end
 
   @impl Stage

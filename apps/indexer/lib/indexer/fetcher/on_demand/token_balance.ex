@@ -194,14 +194,8 @@ defmodule Indexer.Fetcher.OnDemand.TokenBalance do
     |> Map.put(:value_fetched_at, DateTime.utc_now())
   end
 
-  defp prepare_updated_balance({{:error, error}, ctb}, block_number) do
-    Logger.warn(fn ->
-      [
-        "Error on updating current token #{to_string(ctb.token_contract_address_hash)} balance for address #{to_string(ctb.address_hash)} at block number #{block_number}: ",
-        inspect(error)
-      ]
-    end)
-
+  defp prepare_updated_balance({{:error, error}, _ctb}, _block_number) do
+    Logger.warn(fn -> ["Error on updating current token balance: ", inspect(error)] end)
     nil
   end
 

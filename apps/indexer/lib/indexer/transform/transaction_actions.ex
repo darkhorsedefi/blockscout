@@ -13,7 +13,8 @@ defmodule Indexer.Transform.TransactionActions do
   alias Explorer.Chain.Cache.{TransactionActionTokensData, TransactionActionUniswapPools}
   alias Explorer.Chain.{Address, Hash, Token, TransactionAction}
   alias Explorer.Repo
-  alias Indexer.Helper, as: IndexerHelper
+  alias Explorer.SmartContract.Reader
+  alias Indexer.Helper
 
   @mainnet 1
   @goerli 5
@@ -197,7 +198,7 @@ defmodule Indexer.Transform.TransactionActions do
           @aave_v3_liquidation_call_event
         ],
         sanitize_first_topic(log.first_topic)
-      ) && IndexerHelper.address_hash_to_string(log.address_hash, true) == pool_address
+      ) && Helper.address_hash_to_string(log.address_hash, true) == pool_address
     end)
   end
 
@@ -289,12 +290,12 @@ defmodule Indexer.Transform.TransactionActions do
 
     debt_address =
       log.third_topic
-      |> IndexerHelper.log_topic_to_string()
+      |> Helper.log_topic_to_string()
       |> truncate_address_hash()
 
     collateral_address =
       log.second_topic
-      |> IndexerHelper.log_topic_to_string()
+      |> Helper.log_topic_to_string()
       |> truncate_address_hash()
 
     case get_token_data([debt_address, collateral_address]) do
@@ -329,7 +330,7 @@ defmodule Indexer.Transform.TransactionActions do
        when type in ["borrow", "supply", "withdraw", "repay", "flash_loan"] do
     address =
       address_topic
-      |> IndexerHelper.log_topic_to_string()
+      |> Helper.log_topic_to_string()
       |> truncate_address_hash()
 
     case get_token_data([address]) do
@@ -359,7 +360,7 @@ defmodule Indexer.Transform.TransactionActions do
   defp aave_handle_event(type, log, address_topic, chain_id) when type in ["enable_collateral", "disable_collateral"] do
     address =
       address_topic
-      |> IndexerHelper.log_topic_to_string()
+      |> Helper.log_topic_to_string()
       |> truncate_address_hash()
 
     case get_token_data([address]) do
@@ -414,7 +415,7 @@ defmodule Indexer.Transform.TransactionActions do
         first_topic
       ) ||
         (first_topic == @uniswap_v3_transfer_nft_event &&
-           IndexerHelper.address_hash_to_string(log.address_hash, true) == uniswap_v3_positions_nft)
+           Helper.address_hash_to_string(log.address_hash, true) == uniswap_v3_positions_nft)
     end)
   end
 
@@ -423,7 +424,7 @@ defmodule Indexer.Transform.TransactionActions do
 
     with false <- first_topic == @uniswap_v3_transfer_nft_event,
          # check UniswapV3Pool contract is legitimate
-         pool_address <- IndexerHelper.address_hash_to_string(log.address_hash, true),
+         pool_address <- Helper.address_hash_to_string(log.address_hash, true),
          false <- is_nil(legitimate[pool_address]),
          false <- Enum.empty?(legitimate[pool_address]),
          # this is legitimate uniswap pool, so handle this event
@@ -465,19 +466,19 @@ defmodule Indexer.Transform.TransactionActions do
           # This is Transfer event for NFT
           from =
             log.second_topic
-            |> IndexerHelper.log_topic_to_string()
+            |> Helper.log_topic_to_string()
             |> truncate_address_hash()
 
           # credo:disable-for-next-line
           if from == burn_address_hash_string() do
             to =
               log.third_topic
-              |> IndexerHelper.log_topic_to_string()
+              |> Helper.log_topic_to_string()
               |> truncate_address_hash()
 
             [token_id] =
               log.fourth_topic
-              |> IndexerHelper.log_topic_to_string()
+              |> Helper.log_topic_to_string()
               |> decode_data([{:uint, 256}])
 
             mint_nft_ids = Map.put_new(acc, to, %{ids: [], log_index: log.index})
@@ -613,7 +614,7 @@ defmodule Indexer.Transform.TransactionActions do
           sanitize_first_topic(log.first_topic) != @uniswap_v3_transfer_nft_event
         end)
         |> Enum.reduce(addresses_acc, fn log, acc ->
-          pool_address = IndexerHelper.address_hash_to_string(log.address_hash, true)
+          pool_address = Helper.address_hash_to_string(log.address_hash, true)
           Map.put(acc, pool_address, true)
         end)
       end)
@@ -679,14 +680,10 @@ defmodule Indexer.Transform.TransactionActions do
       end)
       |> Enum.map(fn {pool_address, pool} ->
         token0 =
-          if IndexerHelper.address_correct?(pool.token0),
-            do: String.downcase(pool.token0),
-            else: burn_address_hash_string()
+          if Helper.address_correct?(pool.token0), do: String.downcase(pool.token0), else: burn_address_hash_string()
 
         token1 =
-          if IndexerHelper.address_correct?(pool.token1),
-            do: String.downcase(pool.token1),
-            else: burn_address_hash_string()
+          if Helper.address_correct?(pool.token1), do: String.downcase(pool.token1), else: burn_address_hash_string()
 
         fee = if pool.fee == "", do: 0, else: pool.fee
 
@@ -699,7 +696,10 @@ defmodule Indexer.Transform.TransactionActions do
         }
       end)
 
-    {responses_get_pool, error_messages} = read_contracts(requests_get_pool, @uniswap_v3_factory_abi)
+    max_retries = Application.get_env(:explorer, :token_functions_reader_max_retries)
+
+    {responses_get_pool, error_messages} =
+      read_contracts_with_retries(requests_get_pool, @uniswap_v3_factory_abi, max_retries)
 
     if not Enum.empty?(error_messages) or Enum.count(requests_get_pool) != Enum.count(responses_get_pool) do
       Logger.error(
@@ -727,7 +727,9 @@ defmodule Indexer.Transform.TransactionActions do
       end)
       |> List.flatten()
 
-    {responses, error_messages} = read_contracts(requests, @uniswap_v3_pool_abi)
+    max_retries = Application.get_env(:explorer, :token_functions_reader_max_retries)
+
+    {responses, error_messages} = read_contracts_with_retries(requests, @uniswap_v3_pool_abi, max_retries)
 
     if not Enum.empty?(error_messages) do
       incorrect_pools = uniswap_get_incorrect_pools(requests, responses)
@@ -957,7 +959,8 @@ defmodule Indexer.Transform.TransactionActions do
       end)
       |> List.flatten()
 
-    {responses, error_messages} = read_contracts(requests, @erc20_abi)
+    max_retries = Application.get_env(:explorer, :token_functions_reader_max_retries)
+    {responses, error_messages} = read_contracts_with_retries(requests, @erc20_abi, max_retries)
 
     if not Enum.empty?(error_messages) or Enum.count(requests) != Enum.count(responses) do
       Logger.warning(
@@ -973,15 +976,34 @@ defmodule Indexer.Transform.TransactionActions do
     |> Enum.group_by(& &1.transaction_hash)
   end
 
-  defp read_contracts(requests, abi) do
-    max_retries = Application.get_env(:explorer, :token_functions_reader_max_retries)
-    json_rpc_named_arguments = Application.get_env(:explorer, :json_rpc_named_arguments)
+  defp read_contracts_with_retries(requests, abi, retries_left) when retries_left > 0 do
+    responses = Reader.query_contracts(requests, abi)
 
-    IndexerHelper.read_contracts_with_retries(requests, abi, json_rpc_named_arguments, max_retries)
+    error_messages =
+      Enum.reduce(responses, [], fn {status, error_message}, acc ->
+        acc ++
+          if status == :error do
+            [error_message]
+          else
+            []
+          end
+      end)
+
+    if Enum.empty?(error_messages) do
+      {responses, []}
+    else
+      retries_left = retries_left - 1
+
+      if retries_left == 0 do
+        {responses, Enum.uniq(error_messages)}
+      else
+        read_contracts_with_retries(requests, abi, retries_left)
+      end
+    end
   end
 
   defp sanitize_first_topic(first_topic) do
-    if is_nil(first_topic), do: "", else: String.downcase(IndexerHelper.log_topic_to_string(first_topic))
+    if is_nil(first_topic), do: "", else: String.downcase(Helper.log_topic_to_string(first_topic))
   end
 
   defp truncate_address_hash(nil), do: burn_address_hash_string()

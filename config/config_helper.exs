@@ -21,7 +21,6 @@ defmodule ConfigHelper do
         :filecoin -> base_repos ++ [Explorer.Repo.Filecoin]
         :stability -> base_repos ++ [Explorer.Repo.Stability]
         :zksync -> base_repos ++ [Explorer.Repo.ZkSync]
-        :arbitrum -> base_repos ++ [Explorer.Repo.Arbitrum]
         _ -> base_repos
       end
 
