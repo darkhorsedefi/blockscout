@@ -5,6 +5,7 @@ defmodule BlockScoutWeb.API.V2.Helper do
 
   alias Ecto.Association.NotLoaded
   alias Explorer.Chain.Address
+  alias Explorer.Chain.SmartContract.Proxy.Models.Implementation
   alias Explorer.Chain.Transaction.History.TransactionStats
 
   import BlockScoutWeb.Account.AuthController, only: [current_user: 1]
@@ -53,24 +54,44 @@ defmodule BlockScoutWeb.API.V2.Helper do
   """
   @spec address_with_info(any(), any()) :: nil | %{optional(<<_::32, _::_*8>>) => any()}
   def address_with_info(%Address{} = address, _address_hash) do
+    smart_contract? = Address.smart_contract?(address)
+    implementation_names = if smart_contract?, do: Implementation.names(address), else: []
+
+    formatted_implementation_names =
+      implementation_names
+      |> Enum.map(fn name ->
+        %{"name" => name}
+      end)
+
+    implementation_name =
+      if Enum.empty?(implementation_names) do
+        nil
+      else
+        implementation_names |> Enum.at(0)
+      end
+
     %{
       "hash" => Address.checksum(address),
-      "is_contract" => Address.smart_contract?(address),
+      "is_contract" => smart_contract?,
       "name" => address_name(address),
-      "implementation_name" => implementation_name(address),
+      # todo: added for backward compatibility, remove when frontend unbound from these props
+      "implementation_name" => implementation_name,
+      "implementations" => formatted_implementation_names,
       "is_verified" => verified?(address),
-      "ens_domain_name" => address.ens_domain_name
+      "ens_domain_name" => address.ens_domain_name,
+      "metadata" => address.metadata
     }
-  end
-
-  def address_with_info(%{ens_domain_name: name}, address_hash) do
-    nil
-    |> address_with_info(address_hash)
-    |> Map.put("ens_domain_name", name)
   end
 
   def address_with_info(%NotLoaded{}, address_hash) do
     address_with_info(nil, address_hash)
+  end
+
+  def address_with_info(address_info, address_hash) when is_map(address_info) do
+    nil
+    |> address_with_info(address_hash)
+    |> Map.put("ens_domain_name", address_info[:ens_domain_name])
+    |> Map.put("metadata", address_info[:metadata])
   end
 
   def address_with_info(nil, nil) do
@@ -82,8 +103,12 @@ defmodule BlockScoutWeb.API.V2.Helper do
       "hash" => Address.checksum(address_hash),
       "is_contract" => false,
       "name" => nil,
+      # todo: added for backward compatibility, remove when frontend unbound from these props
       "implementation_name" => nil,
-      "is_verified" => nil
+      "implementations" => [],
+      "is_verified" => nil,
+      "ens_domain_name" => nil,
+      "metadata" => nil
     }
   end
 
@@ -100,13 +125,8 @@ defmodule BlockScoutWeb.API.V2.Helper do
 
   def address_name(_), do: nil
 
-  def implementation_name(%Address{smart_contract: %{implementation_name: implementation_name}}),
-    do: implementation_name
-
-  def implementation_name(_), do: nil
-
   def verified?(%Address{smart_contract: nil}), do: false
-  def verified?(%Address{smart_contract: %{metadata_from_verified_twin: true}}), do: false
+  def verified?(%Address{smart_contract: %{metadata_from_verified_bytecode_twin: true}}), do: false
   def verified?(%Address{smart_contract: %NotLoaded{}}), do: nil
   def verified?(%Address{smart_contract: _}), do: true
 
@@ -140,5 +160,45 @@ defmodule BlockScoutWeb.API.V2.Helper do
     latest = Date.add(today, -1)
     x_days_back = Date.add(latest, -1 * (num_days - 1))
     %{earliest: x_days_back, latest: latest}
+  end
+
+  @doc """
+    Checks if an item associated with a DB entity has actual value
+
+    ## Parameters
+    - `associated_item`: an item associated with a DB entity
+
+    ## Returns
+    - `false`: if the item is nil or not loaded
+    - `true`: if the item has actual value
+  """
+  @spec specified?(any()) :: boolean()
+  def specified?(associated_item) do
+    case associated_item do
+      nil -> false
+      %Ecto.Association.NotLoaded{} -> false
+      _ -> true
+    end
+  end
+
+  @doc """
+    Gets the value of an element nested in a map using two keys.
+
+    Clarification: Returns `map[key1][key2]`
+
+    ## Parameters
+    - `map`: The high-level map.
+    - `key1`: The key of the element in `map`.
+    - `key2`: The key of the element in the map accessible by `map[key1]`.
+
+    ## Returns
+    The value of the element, or `nil` if the map accessible by `key1` does not exist.
+  """
+  @spec get_2map_data(map(), any(), any()) :: any()
+  def get_2map_data(map, key1, key2) do
+    case Map.get(map, key1) do
+      nil -> nil
+      inner_map -> Map.get(inner_map, key2)
+    end
   end
 end
